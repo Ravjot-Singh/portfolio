@@ -9,17 +9,17 @@ export function ResponsiveCamera() {
 
     if (aspect < 0.7) {
       // Mobile / portrait
-      camera.position.set(0, 2.5, 21);
+      camera.position.set(0, 1.2, 20);
       camera.fov = 52;
     } 
     else if (aspect < 1.1) {
       // Tablet / narrow desktop
-      camera.position.set(0, 2.5, 19);
+      camera.position.set(0, 1.5, 19);
       camera.fov = 48;
     } 
     else {
       // Desktop
-      camera.position.set(0, 2.5, 17);
+      camera.position.set(0, 1.5, 16);
       camera.fov = 45;
     }
 
