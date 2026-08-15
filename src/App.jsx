@@ -1,5 +1,6 @@
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useState } from "react";
+import { ResponsiveCamera } from "./components/ResponsiveCamera";
 import Stage from "./components/Stage";
 import { BackWall } from "./components/BackWall";
 import { Pillar } from "./components/Pillar";
@@ -12,8 +13,23 @@ import { TheaterLighting } from "./components/TheaterLighting";
 
 
 function Theater({ progress }) {
+  const { size } = useThree();
+
+  const aspect = size.width / size.height;
+
+  let scale = 1;
+
+  if (aspect < 0.7) {
+    scale = 0.72;
+  } else if (aspect < 1.1) {
+    scale = 0.86;
+  }
+
   return (
-    <group position={[0, -0.8, 0]}>
+    <group
+      position={[0, -0.8, 0]}
+      scale={scale}
+    >
 
       <Stage />
       <BackWall />
@@ -130,11 +146,9 @@ function App() {
         <Canvas
           shadows
           gl={{ alpha: true }}
-          camera={{
-            position: [0, 2.5, 17],
-            fov: 45,
-          }}
+
         >
+          <ResponsiveCamera />
           {/* Lighting */}
 
           <ambientLight intensity={0.8} />
