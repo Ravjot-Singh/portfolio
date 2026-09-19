@@ -1,10 +1,23 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { T, presenterX, PRESENTER_START_X } from "../timeline";
+
+const STRIDE_PER_UNIT = 2.2;
+
+const FACE_WALKING = 0.5;
+const FACE_RESTING = -0.28;
+
+const BASE_Z = -0.1;
+
+const BASE_Y = -0.23;
 
 export function Presenter({ progress }) {
 
   const presenterRef = useRef();
+  const torsoRef = useRef();
+  const headRef = useRef();
+  const tasselRef = useRef();
 
   const leftArmRef = useRef();
   const rightArmRef = useRef();
@@ -12,286 +25,308 @@ export function Presenter({ progress }) {
   const leftLegRef = useRef();
   const rightLegRef = useRef();
 
-  const targetX = 0;
+  const phase = useRef(0);
+  const previousX = useRef(PRESENTER_START_X);
+
+  const tasselAngle = useRef(0);
+  const tasselVelocity = useRef(0);
 
   useFrame((state, delta) => {
     if (!presenterRef.current) return;
 
-    const walkStart = 0.12;
-    const walkEnd = 0.47;
+    const step = Math.min(delta, 1 / 30);
+    const time = state.clock.elapsedTime;
 
-    const walkProgress = THREE.MathUtils.clamp(
-      (progress - walkStart) /
-      (walkEnd - walkStart),
-      0,
-      1
-    );
+    const x = presenterX(progress);
 
-    const eased = THREE.MathUtils.smoothstep(
-      walkProgress,
-      0,
-      1
-    );
+    const travelled = x - previousX.current;
 
-    // Position
-    presenterRef.current.position.x =
-      THREE.MathUtils.lerp(
-        -6,
-        3.1,
-        eased
-      );
+    previousX.current = x;
+
+    presenterRef.current.position.x = x;
 
     const walking =
-      progress > walkStart &&
-      progress < walkEnd;
+      progress > T.presenter[0] &&
+      progress < T.presenter[1] &&
+      Math.abs(travelled) > 1e-5;
+
+    phase.current += Math.abs(travelled) * STRIDE_PER_UNIT;
+
+    const walk = Math.sin(phase.current);
+
+    presenterRef.current.rotation.y = THREE.MathUtils.damp(
+      presenterRef.current.rotation.y,
+      walking ? FACE_WALKING : FACE_RESTING,
+      3,
+      step
+    );
 
     if (walking) {
-      const walk = Math.sin(
-        state.clock.elapsedTime * 8
-      );
+      leftLegRef.current.rotation.x = walk * 0.45;
+      rightLegRef.current.rotation.x = -walk * 0.45;
 
-      leftArmRef.current.rotation.z =
-        walk * 0.25;
+      leftArmRef.current.rotation.x = -walk * 0.35;
+      rightArmRef.current.rotation.x = walk * 0.35;
 
-      rightArmRef.current.rotation.z =
-        -walk * 0.25;
+      leftArmRef.current.rotation.z = walk * 0.08;
+      rightArmRef.current.rotation.z = -walk * 0.08;
 
-      leftLegRef.current.rotation.z =
-        -walk * 0.12;
+      presenterRef.current.position.y =
+        BASE_Y + Math.abs(Math.sin(phase.current)) * 0.035;
 
-      rightLegRef.current.rotation.z =
-        walk * 0.12;
+      if (torsoRef.current) {
+        torsoRef.current.scale.set(1, 1, 1);
+      }
     } else {
-      leftArmRef.current.rotation.z =
-        THREE.MathUtils.lerp(
-          leftArmRef.current.rotation.z,
+      for (const limb of [leftArmRef, rightArmRef, leftLegRef, rightLegRef]) {
+        limb.current.rotation.x = THREE.MathUtils.damp(
+          limb.current.rotation.x,
           0,
-          5 * delta
+          5,
+          step
         );
 
-      rightArmRef.current.rotation.z =
-        THREE.MathUtils.lerp(
-          rightArmRef.current.rotation.z,
+        limb.current.rotation.z = THREE.MathUtils.damp(
+          limb.current.rotation.z,
           0,
-          5 * delta
+          5,
+          step
+        );
+      }
+
+      const breath = Math.sin(time * 1.6);
+
+      if (torsoRef.current) {
+        torsoRef.current.scale.y = 1 + breath * 0.012;
+        torsoRef.current.scale.z = 1 + breath * 0.018;
+      }
+
+      presenterRef.current.position.y = BASE_Y + breath * 0.016;
+
+      presenterRef.current.rotation.z = Math.sin(time * 0.35) * 0.022;
+      presenterRef.current.position.x =
+        x + Math.sin(time * 0.27) * 0.03;
+
+      leftArmRef.current.rotation.x += Math.sin(time * 0.8) * 0.03;
+      rightArmRef.current.rotation.x += Math.sin(time * 0.8 + 2.1) * 0.03;
+
+      if (headRef.current) {
+        const glance = -0.22 + Math.sin(time * 0.23) * 0.10;
+
+        headRef.current.rotation.y = THREE.MathUtils.damp(
+          headRef.current.rotation.y,
+          glance,
+          2,
+          step
         );
 
-      leftLegRef.current.rotation.z =
-        THREE.MathUtils.lerp(
-          leftLegRef.current.rotation.z,
-          0,
-          5 * delta
-        );
+        headRef.current.rotation.x = Math.sin(time * 0.19) * 0.05;
+      }
+    }
 
-      rightLegRef.current.rotation.z =
-        THREE.MathUtils.lerp(
-          rightLegRef.current.rotation.z,
-          0,
-          5 * delta
-        );
+    if (tasselRef.current) {
+      const acceleration = travelled / Math.max(step, 1e-4);
+
+      tasselVelocity.current +=
+        (-40 * tasselAngle.current -
+          7 * tasselVelocity.current -
+          18 * acceleration) *
+        step;
+
+      tasselAngle.current += tasselVelocity.current * step;
+
+      tasselRef.current.rotation.z = THREE.MathUtils.clamp(
+        tasselAngle.current,
+        -0.6,
+        0.6
+      );
     }
   });
 
   return (
     <group
       ref={presenterRef}
-      position={[-4.9, 0.4, 0.1]}
+      position={[PRESENTER_START_X, BASE_Y, BASE_Z]}
     >
-      {/* Head */}
-      <mesh
-        position={[0, 2.4, 0]}
-        castShadow
-      >
-        <sphereGeometry args={[0.35, 32, 32]} />
-        <meshStandardMaterial color="#d69b76" />
-      </mesh>
+      <group ref={headRef} position={[0, 2.4, 0]}>
 
-      {/* Graduation Cap */}
+        <mesh castShadow receiveShadow>
+          <sphereGeometry args={[0.35, 32, 32]} />
+          <meshStandardMaterial
+            color="#d69b76"
+            roughness={0.68}
+          />
+        </mesh>
 
-      {/* Cap base / crown */}
-      <mesh
-        position={[0, 2.70, 0]}
-        castShadow
-      >
-        <boxGeometry args={[0.58, 0.19, 0.58]} />
-        <meshStandardMaterial
-          color="#323131"
-          roughness={0.7}
-        />
-      </mesh>
+        <mesh position={[0, 0.30, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.58, 0.19, 0.58]} />
+          <meshStandardMaterial
+            color="#323131"
+            roughness={0.7}
+          />
+        </mesh>
 
-      {/* Flat square top */}
-      <mesh
-        position={[0, 2.85, 0]}
-        rotation={[0, 0, 0]}
-        castShadow
-      >
-        <boxGeometry args={[0.82, 0.09, 0.82]} />
-        <meshStandardMaterial
-          color="#323232"
-          roughness={0.65}
-        />
-      </mesh>
+        <mesh position={[0, 0.45, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.82, 0.09, 0.82]} />
+          <meshStandardMaterial
+            color="#323232"
+            roughness={0.65}
+          />
+        </mesh>
 
-      {/* Tassel */}
-      <mesh
-        position={[0.4, 2.78, 0.1]}
-        castShadow
-      >
-        <cylinderGeometry
-          args={[0.03, 0.03, 0.22, 12]}
-        />
-        <meshStandardMaterial
-          color="#d6b45a"
-          metalness={0.25}
-          roughness={0.5}
-        />
-      </mesh>
+        <group ref={tasselRef} position={[0.40, 0.46, 0.10]}>
+          <mesh position={[0, -0.08, 0]} castShadow>
+            <cylinderGeometry args={[0.03, 0.03, 0.22, 12]} />
+            <meshStandardMaterial
+              color="#d6b45a"
+              metalness={0.65}
+              roughness={0.35}
+            />
+          </mesh>
 
-      {/* Tassel end */}
-      <mesh
-        position={[0.41, 2.60, 0.05]}
-        castShadow
-      >
-        <sphereGeometry args={[0.07, 12, 12]} />
-        <meshStandardMaterial
-          color="#d6b45a"
-          metalness={0.25}
-          roughness={0.5}
-        />
-      </mesh>
+          <mesh position={[0.01, -0.26, -0.05]} castShadow>
+            <sphereGeometry args={[0.07, 12, 12]} />
+            <meshStandardMaterial
+              color="#d6b45a"
+              metalness={0.65}
+              roughness={0.35}
+            />
+          </mesh>
+        </group>
 
-      {/* Neck */}
-      <mesh
-        position={[0, 2.02, 0]}
-        castShadow
-      >
+      </group>
+
+      <mesh position={[0, 2.02, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.12, 0.12, 0.25, 16]} />
-        <meshStandardMaterial color="#d69b76" />
+        <meshStandardMaterial
+          color="#d69b76"
+          roughness={0.68}
+        />
       </mesh>
 
-      {/* Body */}
-      <mesh
-        position={[0, 1.4, 0]}
-        castShadow
-      >
-        <boxGeometry args={[0.75, 1.2, 0.45]} />
-        <meshStandardMaterial color="#1a1919" />
-      </mesh>
+      <group ref={torsoRef} position={[0, 1.4, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[0.75, 1.2, 0.45]} />
+          <meshStandardMaterial
+            color="#17171a"
+            roughness={0.62}
+            metalness={0.03}
+          />
+        </mesh>
 
-      {/* Left Jacket Lapel */}
-      <mesh
-        position={[-0.20, 1.72, 0.245]}
-        rotation={[0, 0, -0.35]}
-        castShadow
-      >
-        <boxGeometry args={[0.18, 0.55, 0.05]} />
-        <meshStandardMaterial color="#292727" />
-      </mesh>
+        <mesh
+          position={[-0.20, 0.32, 0.245]}
+          rotation={[0, 0, -0.35]}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[0.18, 0.55, 0.05]} />
+          <meshStandardMaterial
+            color="#202024"
+            roughness={0.42}
+          />
+        </mesh>
 
+        <mesh
+          position={[0.20, 0.32, 0.245]}
+          rotation={[0, 0, 0.35]}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[0.18, 0.55, 0.05]} />
+          <meshStandardMaterial
+            color="#202024"
+            roughness={0.42}
+          />
+        </mesh>
+      </group>
 
-      {/* Right Jacket Lapel */}
-      <mesh
-        position={[0.20, 1.72, 0.245]}
-        rotation={[0, 0, 0.35]}
-        castShadow
-      >
-        <boxGeometry args={[0.18, 0.55, 0.05]} />
-        <meshStandardMaterial color="#292727" />
-      </mesh>
-
-      {/* Left Arm */}
       <group
         ref={leftArmRef}
         position={[-0.48, 1.85, 0.15]}
       >
-        <mesh
-          position={[0, -0.5, 0]}
-          castShadow
-        >
+        <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.22, 1, 0.22]} />
-          <meshStandardMaterial color="#1a1919" />
+          <meshStandardMaterial
+            color="#17171a"
+            roughness={0.62}
+            metalness={0.03}
+          />
         </mesh>
 
-        {/* Hand */}
-        <mesh
-          position={[0, -1.02, 0]}
-          castShadow
-        >
+        <mesh position={[0, -1.02, 0]} castShadow receiveShadow>
           <sphereGeometry args={[0.13, 16, 16]} />
-          <meshStandardMaterial color="#d69b76" />
+          <meshStandardMaterial
+            color="#d69b76"
+            roughness={0.68}
+          />
         </mesh>
       </group>
 
-      {/* Right Arm */}
       <group
         ref={rightArmRef}
         position={[0.48, 1.85, 0.15]}
       >
-        <mesh
-          position={[0, -0.5, 0]}
-          castShadow
-        >
+        <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.22, 1, 0.22]} />
-          <meshStandardMaterial color="#1a1919" />
+          <meshStandardMaterial
+            color="#17171a"
+            roughness={0.62}
+            metalness={0.03}
+          />
         </mesh>
 
-        {/* Hand */}
-        <mesh
-          position={[0, -1.02, 0]}
-          castShadow
-        >
+        <mesh position={[0, -1.02, 0]} castShadow receiveShadow>
           <sphereGeometry args={[0.13, 16, 16]} />
-          <meshStandardMaterial color="#d69b76" />
+          <meshStandardMaterial
+            color="#d69b76"
+            roughness={0.68}
+          />
         </mesh>
       </group>
 
-      {/* Left Leg */}
       <group
         ref={leftLegRef}
         position={[-0.2, 0.85, 0]}
       >
-        <mesh
-          position={[0, -0.45, 0]}
-          castShadow
-        >
+        <mesh position={[0, -0.45, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.25, 0.9, 0.3]} />
-          <meshStandardMaterial color="#151515" />
+          <meshStandardMaterial
+            color="#151515"
+            roughness={0.62}
+          />
         </mesh>
 
-        {/* Shoe */}
-        <mesh
-          position={[0, -0.92, 0.08]}
-          castShadow
-        >
+        <mesh position={[0, -0.92, 0.08]} castShadow receiveShadow>
           <boxGeometry args={[0.3, 0.15, 0.5]} />
-          <meshStandardMaterial color="#080808" />
+          <meshStandardMaterial
+            color="#0a0a0c"
+            roughness={0.18}
+            metalness={0.10}
+          />
         </mesh>
       </group>
 
-      {/* Right Leg */}
       <group
         ref={rightLegRef}
         position={[0.2, 0.85, 0]}
       >
-        <mesh
-          position={[0, -0.45, 0]}
-          castShadow
-        >
+        <mesh position={[0, -0.45, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.25, 0.9, 0.3]} />
-          <meshStandardMaterial color="#151515" />
+          <meshStandardMaterial
+            color="#151515"
+            roughness={0.62}
+          />
         </mesh>
 
-        {/* Shoe */}
-        <mesh
-          position={[0, -0.92, 0.08]}
-          castShadow
-        >
+        <mesh position={[0, -0.92, 0.08]} castShadow receiveShadow>
           <boxGeometry args={[0.3, 0.15, 0.5]} />
-          <meshStandardMaterial color="#080808" />
+          <meshStandardMaterial
+            color="#0a0a0c"
+            roughness={0.18}
+            metalness={0.10}
+          />
         </mesh>
-
-
       </group>
     </group>
   );

@@ -4,6 +4,9 @@ import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import { sectionProgress } from "../helper/sectionProgress.js";
 import { fadeInOut } from "../helper/fadeInOut.js";
+import { smootherstep } from "../helper/easing.js";
+import { useResponsiveLayout } from "../helper/useResponsiveLayout.js";
+import { T } from "../timeline";
 
 export function AboutCrawl({ progress }) {
     const groupRef = useRef();
@@ -11,81 +14,50 @@ export function AboutCrawl({ progress }) {
     const titleRef = useRef();
     const bodyRef = useRef();
 
+    const { about } = useResponsiveLayout();
+
+    const [start, end] = T.about;
+
     useFrame(() => {
 
         if (!groupRef.current) {
             return;
         }
 
-        const isActive = progress >= 0.52 && progress < 0.68;
+        const isActive = progress >= start && progress < end;
         groupRef.current.visible = isActive;
 
         if (!isActive) {
             return;
         }
 
-        const crawlProgress = sectionProgress(
-            progress,
-            0.52,
-            0.68
-        );
+        const crawlProgress = sectionProgress(progress, start, end);
 
-        const easedProgress = THREE.MathUtils.smoothstep(
-            crawlProgress,
-            0,
-            1
-        );
+        const easedProgress = smootherstep(crawlProgress);
 
-        const y = THREE.MathUtils.lerp(
-            1,
-            1.9,
+        groupRef.current.position.y = THREE.MathUtils.lerp(
+            about.yFrom,
+            about.yTo,
             easedProgress
         );
 
-        const scale = THREE.MathUtils.lerp(
-            1.0,
-            0.55,
-            easedProgress
-        );
-
-        const rotationX = THREE.MathUtils.lerp(
-            -0.20,
-            -0.65,
-            easedProgress
-        );
-
-        groupRef.current.position.y = y;
         groupRef.current.position.z = 0.30;
 
-        groupRef.current.scale.setScalar(scale);
+        groupRef.current.scale.setScalar(
+            THREE.MathUtils.lerp(
+                about.scaleFrom,
+                about.scaleTo,
+                easedProgress
+            )
+        );
 
-        groupRef.current.rotation.x = rotationX;
+        groupRef.current.rotation.x = THREE.MathUtils.lerp(
+            about.tiltFrom,
+            about.tiltTo,
+            easedProgress
+        );
 
-        let opacity = 1;
-
-        if (progress >= 0.52 && progress < 0.57) {
-            opacity = THREE.MathUtils.clamp(
-                (progress - 0.52) / 0.05,
-                0,
-                1
-            );
-        }
-
-        else if (progress >= 0.57 && progress < 0.64) {
-            opacity = 1;
-        }
-
-        else if (progress >= 0.64 && progress < 0.68) {
-            opacity = THREE.MathUtils.clamp(
-                1 - (progress - 0.64) / 0.04,
-                0,
-                1
-            );
-        }
-        else {
-            opacity = 0;
-        }
-
+        const opacity = fadeInOut(progress, start, end, 0.20, 0.22);
 
         if (titleRef.current) {
             titleRef.current.fillOpacity = opacity;
@@ -104,10 +76,8 @@ export function AboutCrawl({ progress }) {
     return (
         <group
             ref={groupRef}
-            position={[0, 1, 0.38]}
+            position={[0, about.yFrom, 0.30]}
         >
-
-            {/* ABOUT ME */}
 
             <Text
                 ref={titleRef}
@@ -119,34 +89,31 @@ export function AboutCrawl({ progress }) {
                 anchorY="middle"
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 ABOUT ME
             </Text>
 
 
-            {/* ABOUT CONTENT */}
-
             <Text
                 ref={bodyRef}
                 position={[0, -0.05, 0]}
-                fontSize={0.22}
-                maxWidth={5.7}
-                lineHeight={1.35}
+                fontSize={about.bodyFont}
+                maxWidth={about.maxWidth}
+                lineHeight={about.lineHeight}
                 color="#c8c8c8"
                 anchorX="center"
                 anchorY="top"
                 textAlign="center"
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 I'm a developer who enjoys turning ideas into things.
-
-
                 {"\n\n"}
                 I’ve worked on full-stack web applications and real-time chat web-app to streaming platform and interactive experiences.
                 {"\n\n"}
                 I enjoy taking an idea, figuring out how it could work, and then building it piece by piece.
-
                 {"\n\n"}
                 This portfolio is another one of those experiments.
             </Text>

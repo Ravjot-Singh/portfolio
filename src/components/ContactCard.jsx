@@ -5,6 +5,7 @@ export function ContactCard({
     type,
     label,
     value,
+    layout,
     onClick,
 }) {
 
@@ -144,8 +145,8 @@ export function ContactCard({
                 onClick={onClick}
 
                 style={{
-                    width: "390px",
-                    height: "70px",
+                    width: `${layout.cardWidth}px`,
+                    height: `${layout.cardHeight}px`,
 
                     display: "flex",
                     alignItems: "center",
@@ -196,8 +197,6 @@ export function ContactCard({
                 }}
             >
 
-                {/* LOGO */}
-
                 <div
                     style={{
                         width: "40px",
@@ -211,8 +210,6 @@ export function ContactCard({
                 </div>
 
 
-                {/* TEXT */}
-
                 <div
                     style={{
                         display: "flex",
@@ -224,7 +221,7 @@ export function ContactCard({
                     <div
                         style={{
                             color: "#d6b45a",
-                            fontSize: "14px",
+                            fontSize: `${layout.labelPx}px`,
                             fontWeight: "600",
                             letterSpacing: "2px",
                         }}
@@ -235,8 +232,8 @@ export function ContactCard({
 
                     <div
                         style={{
-                            color: "#a9a9a9",
-                            fontSize: "12px",
+                            color: "#c2c2c2",
+                            fontSize: `${layout.valuePx}px`,
                             letterSpacing: "0.3px",
                         }}
                     >
@@ -245,8 +242,6 @@ export function ContactCard({
 
                 </div>
 
-
-                {/* ARROW */}
 
                 <div
                     style={{

@@ -2,242 +2,177 @@ import { Text } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
+import { sectionProgress } from "../helper/sectionProgress";
+import { smootherstep } from "../helper/easing";
+import { useResponsiveLayout } from "../helper/useResponsiveLayout";
+import { T } from "../timeline";
+
+function setOpacity(ref, value) {
+    if (!ref.current) return;
+
+    ref.current.fillOpacity = value;
+    ref.current.outlineOpacity = value;
+    ref.current.material.opacity = value;
+}
 
 export function JourneySection({ progress }) {
-
     const groupRef = useRef();
 
     const titleRef = useRef();
-
     const experienceTitleRef = useRef();
     const experienceTextRef = useRef();
-
     const educationTitleRef = useRef();
     const educationTextRef = useRef();
-
     const certificationTitleRef = useRef();
     const certificationTextRef = useRef();
 
+    const { journey } = useResponsiveLayout();
+
+    const [start, end] = T.journey;
 
     useFrame(() => {
-
         if (!groupRef.current) {
             return;
         }
 
-        const isActive = progress >= 1.05 && progress <= 1.15;
+        const isActive = progress >= start && progress <= end;
+
         groupRef.current.visible = isActive;
 
         if (!isActive) {
             return;
         }
 
-        const titleProgress = THREE.MathUtils.clamp(
-            (progress - 1.05) / 0.04,
-            0,
-            1
+        const columnsRange = journey.twoBeats
+            ? [start, start + (end - start) * 0.52]
+            : [start, end];
+
+        const certRange = journey.twoBeats
+            ? [start + (end - start) * 0.52, end]
+            : [start, end];
+
+        const columnsSpan = columnsRange[1] - columnsRange[0];
+        const certSpan = certRange[1] - certRange[0];
+
+        const titleEase = smootherstep(
+            sectionProgress(
+                progress,
+                columnsRange[0],
+                columnsRange[0] + columnsSpan * 0.18
+            )
         );
 
-
-        const mainProgress = THREE.MathUtils.clamp(
-            (progress - 1.07) / 0.05,
-            0,
-            1
+        const experienceEase = smootherstep(
+            sectionProgress(
+                progress,
+                columnsRange[0] + columnsSpan * 0.10,
+                columnsRange[0] + columnsSpan * 0.34
+            )
         );
 
-
-        const certificationProgress = THREE.MathUtils.clamp(
-            (progress - 1.10) / 0.04,
-            0,
-            1
+        const educationEase = smootherstep(
+            sectionProgress(
+                progress,
+                columnsRange[0] + columnsSpan * 0.18,
+                columnsRange[0] + columnsSpan * 0.42
+            )
         );
 
-
-        const exitProgress = THREE.MathUtils.clamp(
-            (progress - 1.13) / 0.02,
-            0,
-            1
+        const certificationEase = smootherstep(
+            sectionProgress(
+                progress,
+                certRange[0] + certSpan * (journey.twoBeats ? 0.10 : 0.30),
+                certRange[0] + certSpan * (journey.twoBeats ? 0.34 : 0.54)
+            )
         );
 
-
-        const titleEase = THREE.MathUtils.smoothstep(
-            titleProgress,
-            0,
-            1
+        const columnsExit = smootherstep(
+            sectionProgress(
+                progress,
+                columnsRange[1] - columnsSpan * 0.22,
+                columnsRange[1]
+            )
         );
 
-        const mainEase = THREE.MathUtils.smoothstep(
-            mainProgress,
-            0,
-            1
+        const certExit = smootherstep(
+            sectionProgress(
+                progress,
+                certRange[1] - certSpan * 0.22,
+                certRange[1]
+            )
         );
 
-        const certificationEase =
-            THREE.MathUtils.smoothstep(
-                certificationProgress,
-                0,
-                1
-            );
+        const columnsHold = 1 - columnsExit;
+        const certHold = 1 - certExit;
 
-        const exitEase = THREE.MathUtils.smoothstep(
-            exitProgress,
-            0,
-            1
-        );
-
-
-        const titleOpacity =
-            titleEase * (1 - exitEase);
-
-        const mainOpacity =
-            mainEase * (1 - exitEase);
-
-        const certificationOpacity =
-            certificationEase * (1 - exitEase);
-
-
+        setOpacity(titleRef, titleEase * columnsHold);
 
         if (titleRef.current) {
-
-            titleRef.current.material.opacity =
-                titleOpacity;
-
-            titleRef.current.fillOpacity =
-                titleOpacity;
-
-            titleRef.current.outlineOpacity =
-                titleOpacity;
-
             titleRef.current.position.y =
-                THREE.MathUtils.lerp(
-                    1.45,
-                    1.60,
-                    titleEase
-                );
+                THREE.MathUtils.lerp(1.45, 1.60, titleEase);
         }
 
+        const experienceOpacity = experienceEase * columnsHold;
+        const educationOpacity = educationEase * columnsHold;
+
+        setOpacity(experienceTitleRef, experienceOpacity);
+        setOpacity(experienceTextRef, experienceOpacity);
+        setOpacity(educationTitleRef, educationOpacity);
+        setOpacity(educationTextRef, educationOpacity);
+
+        const experienceX = THREE.MathUtils.lerp(
+            -2.0,
+            -journey.colX,
+            experienceEase
+        );
+
+        const educationX = THREE.MathUtils.lerp(
+            2.0,
+            journey.colX,
+            educationEase
+        );
 
         if (experienceTitleRef.current) {
-
-            experienceTitleRef.current.material.opacity =
-                mainOpacity;
-
-            experienceTitleRef.current.fillOpacity =
-                mainOpacity;
-
-            experienceTitleRef.current.outlineOpacity =
-                mainOpacity;
-
-            experienceTitleRef.current.position.x =
-                THREE.MathUtils.lerp(
-                    -2.0,
-                    -1.65,
-                    mainEase
-                );
+            experienceTitleRef.current.position.x = experienceX;
         }
-
 
         if (experienceTextRef.current) {
-
-            experienceTextRef.current.material.opacity =
-                mainOpacity;
-
-            experienceTextRef.current.fillOpacity =
-                mainOpacity;
-
-            experienceTextRef.current.outlineOpacity =
-                mainOpacity;
-
-            experienceTextRef.current.position.x =
-                THREE.MathUtils.lerp(
-                    -2.0,
-                    -1.65,
-                    mainEase
-                );
+            experienceTextRef.current.position.x = experienceX;
         }
 
-
         if (educationTitleRef.current) {
-
-            educationTitleRef.current.material.opacity =
-                mainOpacity;
-
-            educationTitleRef.current.fillOpacity =
-                mainOpacity;
-
-            educationTitleRef.current.outlineOpacity =
-                mainOpacity;
-
-            educationTitleRef.current.position.x =
-                THREE.MathUtils.lerp(
-                    2.0,
-                    1.68,
-                    mainEase
-                );
+            educationTitleRef.current.position.x = educationX;
         }
 
         if (educationTextRef.current) {
-
-            educationTextRef.current.material.opacity =
-                mainOpacity;
-
-            educationTextRef.current.fillOpacity =
-                mainOpacity;
-
-            educationTextRef.current.outlineOpacity =
-                mainOpacity;
-
-            educationTextRef.current.position.x =
-                THREE.MathUtils.lerp(
-                    2.0,
-                    1.72,
-                    mainEase
-                );
+            educationTextRef.current.position.x = educationX;
         }
+
+        const certificationOpacity = certificationEase * certHold;
+
+        setOpacity(certificationTitleRef, certificationOpacity);
+        setOpacity(certificationTextRef, certificationOpacity);
+
+        const certHeadingY = journey.twoBeats ? 0.95 : -0.90;
+        const certBodyY = journey.twoBeats ? 0.55 : -1.12;
 
         if (certificationTitleRef.current) {
-
-            certificationTitleRef.current.material.opacity =
-                certificationOpacity;
-
-            certificationTitleRef.current.fillOpacity =
-                certificationOpacity;
-
-            certificationTitleRef.current.outlineOpacity =
-                certificationOpacity;
-
             certificationTitleRef.current.position.y =
                 THREE.MathUtils.lerp(
-                    -1.05,
-                    -0.90,
+                    certHeadingY - 0.10,
+                    certHeadingY,
                     certificationEase
                 );
         }
-
 
         if (certificationTextRef.current) {
-
-            certificationTextRef.current.material.opacity =
-                certificationOpacity;
-
-            certificationTextRef.current.fillOpacity =
-                certificationOpacity;
-
-            certificationTextRef.current.outlineOpacity =
-                certificationOpacity;
-
             certificationTextRef.current.position.y =
                 THREE.MathUtils.lerp(
-                    -1.45,
-                    -1.20,
+                    certBodyY - 0.10,
+                    certBodyY,
                     certificationEase
                 );
         }
-
-
-        groupRef.current.visible =
-            progress >= 1.05 &&
-            progress <= 1.15;
     });
 
 
@@ -258,13 +193,14 @@ export function JourneySection({ progress }) {
                 anchorY="middle"
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 JOURNEY
             </Text>
 
             <Text
                 ref={experienceTitleRef}
-                position={[-1.67, 0.85, 0]}
+                position={[-journey.colX, 0.85, 0]}
                 fontSize={0.20}
                 letterSpacing={0.08}
                 color="#d6b45a"
@@ -272,6 +208,7 @@ export function JourneySection({ progress }) {
                 anchorY="middle"
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 EXPERIENCE
             </Text>
@@ -279,16 +216,17 @@ export function JourneySection({ progress }) {
 
             <Text
                 ref={experienceTextRef}
-                position={[-1.67, 0.50, 0]}
-                fontSize={0.17}
-                lineHeight={1.45}
+                position={[-journey.colX, 0.50, 0]}
+                fontSize={journey.colFont}
+                lineHeight={journey.colLineHeight}
                 color="#c8c8c8"
                 anchorX="center"
                 anchorY="top"
                 textAlign="center"
-                maxWidth={2.6}
+                maxWidth={journey.colMaxWidth}
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 Ryaz.io — Ludhiana{"\n"}
                 Backend Development{"\n"}
@@ -300,7 +238,7 @@ export function JourneySection({ progress }) {
 
             <Text
                 ref={educationTitleRef}
-                position={[1.65, 0.85, 0]}
+                position={[journey.colX, 0.85, 0]}
                 fontSize={0.20}
                 letterSpacing={0.08}
                 color="#d6b45a"
@@ -308,6 +246,7 @@ export function JourneySection({ progress }) {
                 anchorY="middle"
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 EDUCATION
             </Text>
@@ -315,16 +254,17 @@ export function JourneySection({ progress }) {
 
             <Text
                 ref={educationTextRef}
-                position={[1.65, 0.50, 0]}
-                fontSize={0.17}
-                lineHeight={1.45}
+                position={[journey.colX, 0.50, 0]}
+                fontSize={journey.colFont}
+                lineHeight={journey.colLineHeight}
                 color="#c8c8c8"
                 anchorX="center"
                 anchorY="top"
                 textAlign="center"
-                maxWidth={2.6}
+                maxWidth={journey.colMaxWidth}
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 B.Tech — Computer Science{"\n"}
                 & Engineering{"\n\n"}
@@ -337,7 +277,7 @@ export function JourneySection({ progress }) {
 
             <Text
                 ref={certificationTitleRef}
-                position={[-0.1, -0.88, 0]}
+                position={[0, -0.90, 0]}
                 fontSize={0.20}
                 letterSpacing={0.08}
                 color="#d6b45a"
@@ -345,6 +285,7 @@ export function JourneySection({ progress }) {
                 anchorY="middle"
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 CERTIFICATIONS
             </Text>
@@ -352,16 +293,17 @@ export function JourneySection({ progress }) {
 
             <Text
                 ref={certificationTextRef}
-                position={[0, -1.25, 0]}
-                fontSize={0.17}
+                position={[0, -1.12, 0]}
+                fontSize={journey.certFont}
                 lineHeight={1.45}
                 color="#c8c8c8"
                 anchorX="center"
                 anchorY="top"
                 textAlign="center"
-                maxWidth={5.5}
+                maxWidth={journey.certMaxWidth}
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 Cisco Network Basics — Cisco Networking Academy{"\n\n"}
                 AWS Academy — Cloud Foundations

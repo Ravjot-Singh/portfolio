@@ -2,12 +2,24 @@ import { Text } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
+import { sectionProgress } from "../helper/sectionProgress";
+import { smootherstep } from "../helper/easing";
+import { useResponsiveLayout } from "../helper/useResponsiveLayout";
+import { T, PROJECT_SLIDES } from "../timeline";
 
 const projects = [
     {
         title: "CHAT-IN",
         subtitle: "Real-Time Messaging",
-        tech: "React.js • TailwindCSS • MongoDB • Arcjet • Zustand • Socket.IO • Cloudinary",
+        tech: [
+            "React.js",
+            "TailwindCSS",
+            "MongoDB",
+            "Arcjet",
+            "Zustand",
+            "Socket.IO",
+            "Cloudinary",
+        ],
         points: [
             "Instant communication between users",
             "Real-time message synchronization",
@@ -17,7 +29,7 @@ const projects = [
     {
         title: "YTEENS",
         subtitle: "Video & Live Streaming",
-        tech: "React Native • Expo • Axios • Node.js • LiveKit",
+        tech: ["React Native", "Expo", "Axios", "Node.js", "LiveKit"],
         points: [
             "Contributed to the video player",
             "Live streaming functionality",
@@ -27,7 +39,7 @@ const projects = [
     {
         title: "COMMN",
         subtitle: "E-Commerce Platform",
-        tech: "React.js • TailwindCSS • PostgreSQL • Polar • Stream",
+        tech: ["React.js", "TailwindCSS", "PostgreSQL", "Polar", "Stream"],
         points: [
             "Product browsing and cart management",
             "Authentication and secure checkout",
@@ -36,7 +48,21 @@ const projects = [
     }
 ];
 
-function ProjectSlide({ project, progress, start, end }) {
+function formatTech(tech, split) {
+    if (!split) return tech.join(" • ");
+
+    const half = Math.ceil(tech.length / 2);
+
+    return (
+        tech.slice(0, half).join(" • ") +
+        "\n" +
+        tech.slice(half).join(" • ")
+    );
+}
+
+function ProjectSlide({ project, progress, window: win, layout }) {
+    const { start, end, enterFrom, enterTo, exitFrom, exitTo } = win;
+
 
     const groupRef = useRef();
 
@@ -49,53 +75,48 @@ function ProjectSlide({ project, progress, start, end }) {
 
         if (!groupRef.current) return;
 
-        const local = THREE.MathUtils.clamp(
-            (progress - start) / (end - start),
-            0,
-            1
-        );
+        const local = sectionProgress(progress, start, end);
 
         groupRef.current.visible =
-            progress >= start &&
-            progress <= end;
+            progress >= enterFrom &&
+            progress <= exitTo;
 
-        const enter = THREE.MathUtils.smoothstep(
-            Math.min(local / 0.35, 1),
-            0,
-            1
+        const enter = smootherstep(
+            sectionProgress(progress, enterFrom, enterTo)
         );
 
-        const exit = THREE.MathUtils.smoothstep(
-            Math.max((local - 0.75) / 0.25, 0),
-            0,
-            1
+        const exit = smootherstep(
+            sectionProgress(progress, exitFrom, exitTo)
         );
 
-        const opacity = enter * (1 - exit);
+        const hold = 1 - exit;
 
         groupRef.current.position.y =
-            THREE.MathUtils.lerp(
-                -0.15,
-                0.12,
-                local
-            );
+            THREE.MathUtils.lerp(-0.15, 0.12, smootherstep(local));
 
-        const scale = THREE.MathUtils.lerp(
-            0.92,
-            1,
-            enter
+        groupRef.current.scale.setScalar(
+            THREE.MathUtils.lerp(0.92, 1, enter)
         );
 
-        groupRef.current.scale.setScalar(scale);
+        const rows = [titleRef, subtitleRef, techRef, pointsRef];
 
-        [
-            titleRef,
-            subtitleRef,
-            techRef,
-            pointsRef
-        ].forEach(ref => {
+        const enterSpan = enterTo - enterFrom;
+
+        rows.forEach((ref, index) => {
 
             if (!ref.current) return;
+
+            const delay = index * enterSpan * 0.22;
+
+            const rowEnter = smootherstep(
+                sectionProgress(
+                    progress,
+                    enterFrom + delay,
+                    enterTo + delay
+                )
+            );
+
+            const opacity = rowEnter * hold;
 
             ref.current.material.opacity = opacity;
             ref.current.fillOpacity = opacity;
@@ -118,6 +139,7 @@ function ProjectSlide({ project, progress, start, end }) {
                 anchorY="middle"
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 {project.title}
             </Text>
@@ -131,6 +153,7 @@ function ProjectSlide({ project, progress, start, end }) {
                 anchorY="middle"
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 {project.subtitle}
             </Text>
@@ -138,28 +161,33 @@ function ProjectSlide({ project, progress, start, end }) {
             <Text
                 ref={techRef}
                 position={[0, 0.25, 0]}
-                fontSize={0.19}
+                fontSize={layout.techFont}
+                lineHeight={1.4}
                 color="#bfbfbf"
                 anchorX="center"
                 anchorY="middle"
-                maxWidth={5.6}
+                textAlign="center"
+                maxWidth={layout.techMaxWidth}
                 transparent
                 depthWrite={false}
+                fog={false}
             >
-                {project.tech}
+                {formatTech(project.tech, layout.splitTech)}
             </Text>
 
             <Text
                 ref={pointsRef}
                 position={[0, -0.55, 0]}
-                fontSize={0.23}
+                fontSize={layout.pointsFont}
                 lineHeight={1.55}
                 color="#c8c8c8"
                 anchorX="center"
                 anchorY="middle"
                 textAlign="center"
+                maxWidth={layout.pointsMaxWidth}
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 {project.points.join("\n")}
             </Text>
@@ -175,11 +203,17 @@ export function ProjectsSection({ progress }) {
     const groupRef = useRef();
     const headingRef = useRef();
 
+    const { projects: layout } = useResponsiveLayout();
+
+    const [start, end] = T.projects;
+    const span = end - start;
+
     useFrame(() => {
 
         if (!groupRef.current) return;
 
-        const isActive = progress >= 0.90 && progress <= 1.05;
+        const isActive = progress >= start && progress <= end;
+
         groupRef.current.visible = isActive;
 
         if (!isActive) {
@@ -188,50 +222,24 @@ export function ProjectsSection({ progress }) {
 
         if (headingRef.current) {
 
-            const headingEnter = THREE.MathUtils.clamp(
-                (progress - 0.90) / 0.04,
-                0,
-                1
+            const enterEase = smootherstep(
+                sectionProgress(progress, start, start + span * 0.14)
             );
 
-            const headingExit = THREE.MathUtils.clamp(
-                (progress - 1.03) / 0.02,
-                0,
-                1
+            const exitEase = smootherstep(
+                sectionProgress(progress, end - span * 0.14, end)
             );
 
-            const enterEase = THREE.MathUtils.smoothstep(
-                headingEnter,
-                0,
-                1
-            );
+            const opacity = enterEase * (1 - exitEase);
 
-            const exitEase = THREE.MathUtils.smoothstep(
-                headingExit,
-                0,
-                1
-            );
-
-            const opacity =
-                enterEase * (1 - exitEase);
-
-            headingRef.current.material.opacity =
-                opacity;
-
-            headingRef.current.fillOpacity =
-                opacity;
-
-            headingRef.current.outlineOpacity =
-                opacity;
+            headingRef.current.material.opacity = opacity;
+            headingRef.current.fillOpacity = opacity;
+            headingRef.current.outlineOpacity = opacity;
         }
 
     });
 
-    const ranges = useMemo(() => ([
-        [0.90, 0.95],
-        [0.95, 1.00],
-        [1.00, 1.05]
-    ]), []);
+    const ranges = useMemo(() => PROJECT_SLIDES, []);
 
     return (
 
@@ -242,7 +250,7 @@ export function ProjectsSection({ progress }) {
 
             <Text
                 ref={headingRef}
-                position={[0, 1.75, 0]}
+                position={[0, 1.95, 0]}
                 fontSize={0.40}
                 letterSpacing={0.10}
                 color="#888888"
@@ -250,6 +258,7 @@ export function ProjectsSection({ progress }) {
                 anchorY="middle"
                 transparent
                 depthWrite={false}
+                fog={false}
             >
                 PROJECTS
             </Text>
@@ -260,8 +269,8 @@ export function ProjectsSection({ progress }) {
                     key={project.title}
                     project={project}
                     progress={progress}
-                    start={ranges[i][0]}
-                    end={ranges[i][1]}
+                    window={ranges[i]}
+                    layout={layout}
                 />
 
             ))}

@@ -1,5 +1,6 @@
-import { Canvas, useThree } from "@react-three/fiber";
-import { useEffect, useState } from "react";
+import { Canvas, useThree, useFrame } from "@react-three/fiber";
+import { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
 import { ResponsiveCamera } from "./components/ResponsiveCamera";
 import Stage from "./components/Stage";
 import { BackWall } from "./components/BackWall";
@@ -10,26 +11,79 @@ import { CurtainHeader } from "./components/CurtainHeader";
 import { PresentationScreen } from "./components/PresentationScreen";
 import { Presenter } from "./components/Presenter";
 import { TheaterLighting } from "./components/TheaterLighting";
+import { tierFor, TIERS } from "./helper/useResponsiveLayout";
+import { sectionProgress } from "./helper/sectionProgress";
+import { T } from "./timeline";
+import { lowTier } from "./helper/quality";
 
+
+function SceneFog() {
+  const { size } = useThree();
+
+  const { fogDensity } = TIERS[tierFor(size.width / size.height)];
+
+  return <fogExp2 attach="fog" args={["#0b0809", fogDensity]} />;
+}
 
 function Theater({ progress }) {
   const { size } = useThree();
 
-  const aspect = size.width / size.height;
+  const tier = tierFor(size.width / size.height);
 
-  let scale = 1;
+  const { scale } = TIERS[tier];
 
-  if (aspect < 0.7) {
-    scale = 0.72;
-  } else if (aspect < 1.1) {
-    scale = 0.86;
-  }
+  const screenLightRef = useRef();
+
+  useFrame(() => {
+    if (!screenLightRef.current) return;
+
+    screenLightRef.current.intensity =
+      8 * sectionProgress(progress, ...T.screenOn);
+  });
 
   return (
     <group
       position={[0, -0.8, 0]}
       scale={scale}
     >
+      <hemisphereLight args={["#46587a", "#120b07", 0.55]} />
+
+      <directionalLight
+        position={[-7, 6, 6]}
+        intensity={0.5}
+        color="#7f9ac4"
+      />
+
+      <pointLight
+        position={[0, -0.15, 3.3]}
+        intensity={9}
+        color="#ff9a4d"
+        distance={11}
+        decay={2}
+      />
+
+      <pointLight
+        ref={screenLightRef}
+        position={[0, 3, 0.6]}
+        intensity={0}
+        color="#9fc4ff"
+        distance={9}
+        decay={2}
+      />
+
+      {!lowTier && (
+        <spotLight
+          position={[-7, 7.5, -5]}
+          angle={0.7}
+          penumbra={1}
+          intensity={110}
+          distance={22}
+          decay={2}
+          color="#4f7ad6"
+        />
+      )}
+
+      <TheaterLighting progress={progress} />
 
       <Stage />
       <BackWall />
@@ -67,12 +121,18 @@ function App() {
   const [targetProgress, setTargetProgress] = useState(0);
 
   useEffect(() => {
+    let scrollHeight = 0;
+
+    const measure = () => {
+      const viewport =
+        window.visualViewport?.height ?? window.innerHeight;
+
+      scrollHeight =
+        document.documentElement.scrollHeight - viewport;
+    };
+
     const handleScroll = () => {
       const scrollTop = window.scrollY;
-
-      const scrollHeight =
-        document.documentElement.scrollHeight -
-        window.innerHeight;
 
       const scaledProgress =
         scrollHeight > 0
@@ -82,12 +142,22 @@ function App() {
       setTargetProgress(Math.min(scaledProgress, 1.30));
     };
 
-    window.addEventListener("scroll", handleScroll);
+    const handleResize = () => {
+      measure();
+      handleScroll();
+    };
 
+    measure();
     handleScroll();
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
     };
   }, []);
 
@@ -133,7 +203,6 @@ function App() {
     `,
       }}
     >
-      {/* Fixed theater */}
       <div
         style={{
           position: "fixed",
@@ -144,29 +213,33 @@ function App() {
         }}
       >
         <Canvas
-          shadows
-          gl={{ alpha: true }}
-
+          shadows="percentage"
+          dpr={[1, 1.75]}
+          gl={{
+            alpha: true,
+            antialias: true,
+            powerPreference: "high-performance",
+            toneMapping: THREE.AgXToneMapping,
+            toneMappingExposure: 1.3,
+          }}
         >
-          <ResponsiveCamera />
-          {/* Lighting */}
+          <SceneFog />
 
-          <ambientLight intensity={0.8} />
+          <ResponsiveCamera progress={progress} />
 
-          <directionalLight position={[1, 5, 3.2]} />
-
-          <pointLight
-            position={[0, 5, 3]}
-            intensity={10}
-            distance={10}
-            decay={2}
-          />
-
-          {/* Theater */}
-          <TheaterLighting progress={progress} />
           <Theater progress={progress} />
         </Canvas>
       </div>
+
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          background:
+            "radial-gradient(ellipse at 50% 45%, transparent 38%, rgba(0,0,0,0.55) 100%)",
+        }}
+      />
     </div>
   );
 }

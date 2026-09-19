@@ -4,6 +4,7 @@ import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import { fadeInOut } from "../helper/fadeInOut.js";
 import { sectionProgress } from "../helper/sectionProgress.js";
+import { T } from "../timeline";
 import { AboutCrawl } from "./AboutCrawl";
 import { SkillsSection } from "./SkillsSection";
 import { ProjectsSection } from "./ProjectSection";
@@ -15,26 +16,44 @@ export function PresentationScreen({ progress }) {
   const welcomeRef = useRef();
   const nameRef = useRef();
   const subtitleRef = useRef();
+  const panelRef = useRef();
 
+  const [welcomeStart, welcomeEnd] = T.welcome;
 
   useFrame(() => {
 
-    const welcomeOpacity = fadeInOut(progress, 0.30, 0.50);
+    if (panelRef.current) {
+      panelRef.current.emissiveIntensity =
+        sectionProgress(progress, ...T.screenOn);
+    }
 
-    const nameOpacity =
-      progress >= 0.34 && progress < 0.50
-        ? fadeInOut(progress, 0.34, 0.51)
-        : 0;
+    const welcomeOpacity = fadeInOut(
+      progress,
+      welcomeStart,
+      welcomeEnd,
+      0.18,
+      0.22
+    );
+
+    const nameOpacity = fadeInOut(
+      progress,
+      welcomeStart + 0.04,
+      welcomeEnd,
+      0.18,
+      0.22
+    );
 
     const subtitleOpacity = fadeInOut(
       progress,
-      0.38,
-      0.52
+      welcomeStart + 0.08,
+      welcomeEnd,
+      0.18,
+      0.22
     );
 
 
     if (welcomeRef.current) {
-      welcomeRef.current.visible = progress < 0.52;
+      welcomeRef.current.visible = progress < welcomeEnd;
 
       welcomeRef.current.material.opacity = welcomeOpacity;
       welcomeRef.current.fillOpacity = welcomeOpacity;
@@ -42,7 +61,7 @@ export function PresentationScreen({ progress }) {
     }
 
     if (nameRef.current) {
-      nameRef.current.visible = progress < 0.52;
+      nameRef.current.visible = progress < welcomeEnd;
 
       nameRef.current.material.opacity = nameOpacity;
       nameRef.current.fillOpacity = nameOpacity;
@@ -58,7 +77,7 @@ export function PresentationScreen({ progress }) {
     }
 
     if (subtitleRef.current) {
-      subtitleRef.current.visible = progress < 0.52;
+      subtitleRef.current.visible = progress < welcomeEnd;
 
       subtitleRef.current.material.opacity = subtitleOpacity;
       subtitleRef.current.fillOpacity = subtitleOpacity;
@@ -72,20 +91,29 @@ export function PresentationScreen({ progress }) {
   return (
     <group position={[0, 3, -2]}>
 
-      {/* Frame */}
+      <mesh position={[0, 0, -0.08]} castShadow receiveShadow>
+        <boxGeometry
+          args={[8.5, 5.2, 0.22]}
+        />
 
-      <mesh>
+        <meshStandardMaterial
+          color="#4a3318"
+          metalness={0.30}
+          roughness={0.40}
+        />
+      </mesh>
+
+      <mesh castShadow receiveShadow>
         <boxGeometry
           args={[8, 4.7, 0.3]}
         />
 
         <meshStandardMaterial
-          color="#2a1710"
-          roughness={0.65}
+          color="#33200f"
+          roughness={0.5}
+          metalness={0.25}
         />
       </mesh>
-
-      {/* Screen */}
 
       <mesh position={[0, 0, 0.18]}>
         <boxGeometry
@@ -93,8 +121,11 @@ export function PresentationScreen({ progress }) {
         />
 
         <meshStandardMaterial
-          color="#080808"
-          roughness={0.35}
+          ref={panelRef}
+          color="#05060a"
+          roughness={0.62}
+          emissive="#0b1424"
+          emissiveIntensity={0}
         />
       </mesh>
 

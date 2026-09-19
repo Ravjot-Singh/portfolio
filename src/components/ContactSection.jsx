@@ -1,8 +1,12 @@
 import { ContactCard } from "./ContactCard";
-import { Html, Text } from "@react-three/drei";
+import { Text } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
+import { sectionProgress } from "../helper/sectionProgress";
+import { smootherstep } from "../helper/easing";
+import { useResponsiveLayout } from "../helper/useResponsiveLayout";
+import { T } from "../timeline";
 
 export function ContactSection({ progress }) {
 
@@ -12,6 +16,11 @@ export function ContactSection({ progress }) {
     const gmailDomRef = useRef();
     const githubDomRef = useRef();
     const linkedinDomRef = useRef();
+
+    const { contact } = useResponsiveLayout();
+
+    const [start, end] = T.contact;
+    const span = end - start;
 
     const links = {
         gmail: {
@@ -44,178 +53,92 @@ export function ContactSection({ progress }) {
     };
 
 
-useFrame(() => {
+    useFrame(() => {
 
-    if (!groupRef.current) {
-        return;
-    }
-
-
-    const contactActive =
-        progress >= 1.15 &&
-        progress <= 1.23;
-
-
-    groupRef.current.visible = contactActive;
-
-    const titleProgress =
-        THREE.MathUtils.clamp(
-            (progress - 1.15) / 0.03,
-            0,
-            1
-        );
-
-
-    const titleEase =
-        THREE.MathUtils.smoothstep(
-            titleProgress,
-            0,
-            1
-        );
-
-
-    const messageProgress =
-        THREE.MathUtils.clamp(
-            (progress - 1.17) / 0.03,
-            0,
-            1
-        );
-
-
-    const messageEase =
-        THREE.MathUtils.smoothstep(
-            messageProgress,
-            0,
-            1
-        );
-
-
-    const cardsInProgress =
-        THREE.MathUtils.clamp(
-            (progress - 1.19) / 0.04,
-            0,
-            1
-        );
-
-
-    const cardsInEase =
-        THREE.MathUtils.smoothstep(
-            cardsInProgress,
-            0,
-            1
-        );
-
-    const cardsOutProgress =
-        THREE.MathUtils.clamp(
-            (progress - 1.27) / 0.03,
-            0,
-            1
-        );
-
-
-    const cardsOutEase =
-        THREE.MathUtils.smoothstep(
-            cardsOutProgress,
-            0,
-            1
-        );
-
-
-    const titleOpacity =
-        contactActive
-            ? titleEase
-            : 0;
-
-
-    const messageOpacity =
-        contactActive
-            ? messageEase
-            : 0;
-
-
-    const cardOpacity =
-        contactActive
-            ? cardsInEase * (1 - cardsOutEase)
-            : 0;
-
-    if (titleRef.current) {
-
-        titleRef.current.material.opacity =
-            titleOpacity;
-
-        titleRef.current.fillOpacity =
-            titleOpacity;
-
-        titleRef.current.outlineOpacity =
-            titleOpacity;
-
-        titleRef.current.position.y =
-            THREE.MathUtils.lerp(
-                1.20,
-                1.65,
-                titleEase
-            );
-    }
-
-
-    if (messageRef.current) {
-
-        messageRef.current.material.opacity =
-            messageOpacity;
-
-        messageRef.current.fillOpacity =
-            messageOpacity;
-
-        messageRef.current.outlineOpacity =
-            messageOpacity;
-
-        messageRef.current.position.y =
-            THREE.MathUtils.lerp(
-                0.72,
-                1.20,
-                messageEase
-            );
-    }
-
-    const cardRefs = [
-        gmailDomRef,
-        githubDomRef,
-        linkedinDomRef,
-    ];
-
-
-    cardRefs.forEach((ref) => {
-
-        if (!ref.current) {
+        if (!groupRef.current) {
             return;
         }
 
+        const contactActive = progress >= start && progress <= end;
 
-        const visible =
-            cardOpacity > 0.02;
+        groupRef.current.visible = contactActive;
 
+        const titleEase = smootherstep(
+            sectionProgress(progress, start, start + span * 0.16)
+        );
 
-        ref.current.style.opacity =
-            String(cardOpacity);
+        const messageEase = smootherstep(
+            sectionProgress(
+                progress,
+                start + span * 0.08,
+                start + span * 0.24
+            )
+        );
 
+        const cardsInEase = smootherstep(
+            sectionProgress(
+                progress,
+                start + span * 0.16,
+                start + span * 0.42
+            )
+        );
 
-        ref.current.style.visibility =
-            visible
-                ? "visible"
-                : "hidden";
+        const exitEase = smootherstep(
+            sectionProgress(progress, end - span * 0.30, end - span * 0.09)
+        );
 
+        const hold = 1 - exitEase;
 
-        ref.current.style.pointerEvents =
-            visible
-                ? "auto"
-                : "none";
+        const titleOpacity = contactActive ? titleEase * hold : 0;
+        const messageOpacity =
+            contactActive && contact.showMessage ? messageEase * hold : 0;
+        const cardOpacity = contactActive ? cardsInEase * hold : 0;
 
+        if (titleRef.current) {
+            titleRef.current.material.opacity = titleOpacity;
+            titleRef.current.fillOpacity = titleOpacity;
+            titleRef.current.outlineOpacity = titleOpacity;
 
-        ref.current.style.transform =
-            `scale(${0.92 + cardsInEase * 0.08})`;
+            titleRef.current.position.y =
+                THREE.MathUtils.lerp(1.20, 1.65, titleEase);
+        }
+
+        if (messageRef.current) {
+            messageRef.current.visible = contact.showMessage;
+
+            messageRef.current.material.opacity = messageOpacity;
+            messageRef.current.fillOpacity = messageOpacity;
+            messageRef.current.outlineOpacity = messageOpacity;
+
+            messageRef.current.position.y =
+                THREE.MathUtils.lerp(0.72, 1.20, messageEase);
+        }
+
+        const cardRefs = [
+            gmailDomRef,
+            githubDomRef,
+            linkedinDomRef,
+        ];
+
+        cardRefs.forEach((ref) => {
+
+            if (!ref.current) {
+                return;
+            }
+
+            const visible = cardOpacity > 0.02;
+
+            ref.current.style.opacity = String(cardOpacity);
+
+            ref.current.style.visibility = visible ? "visible" : "hidden";
+
+            ref.current.style.pointerEvents = visible ? "auto" : "none";
+
+            ref.current.style.transform =
+                `scale(${0.92 + cardsInEase * 0.08})`;
+        });
+
     });
-
-});
 
 
     return (
@@ -229,7 +152,7 @@ useFrame(() => {
             <Text
                 ref={titleRef}
                 position={[0, 1.20, 0]}
-                fontSize={0.38}
+                fontSize={contact.titleFont}
                 letterSpacing={0.12}
                 color="#d6b45a"
                 anchorX="center"
@@ -237,6 +160,7 @@ useFrame(() => {
                 transparent
                 depthWrite={false}
                 depthTest={false}
+                fog={false}
             >
                 CONTACT
             </Text>
@@ -251,18 +175,20 @@ useFrame(() => {
                 transparent
                 depthWrite={false}
                 depthTest={false}
+                fog={false}
             >
                 Let's build something.
             </Text>
 
 
-            <group position={[0, 0.40, 0]}>
+            <group position={[0, contact.slots[0], 0]}>
 
                 <ContactCard
                     domRef={gmailDomRef}
                     type="gmail"
                     label={links.gmail.label}
                     value={links.gmail.value}
+                    layout={contact}
                     onClick={() =>
                         openLink(links.gmail.url)
                     }
@@ -271,13 +197,14 @@ useFrame(() => {
             </group>
 
 
-            <group position={[0, -0.50, 0]}>
+            <group position={[0, contact.slots[1], 0]}>
 
                 <ContactCard
                     domRef={githubDomRef}
                     type="github"
                     label={links.github.label}
                     value={links.github.value}
+                    layout={contact}
                     onClick={() =>
                         openLink(links.github.url)
                     }
@@ -285,13 +212,14 @@ useFrame(() => {
 
             </group>
 
-            <group position={[0, -1.40, 0]}>
+            <group position={[0, contact.slots[2], 0]}>
 
                 <ContactCard
                     domRef={linkedinDomRef}
                     type="linkedin"
                     label={links.linkedin.label}
                     value={links.linkedin.value}
+                    layout={contact}
                     onClick={() =>
                         openLink(links.linkedin.url)
                     }
